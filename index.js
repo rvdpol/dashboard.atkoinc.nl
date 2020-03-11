@@ -5,13 +5,13 @@ const hbs  = require('express-handlebars')
 const session = require('express-session')
 const axios = require('axios')
 const bodyParser = require('body-parser')
-const urlencodedParser = bodyParser.urlencoded({ extended: true });
 
 var passport = require('passport');
 var logger = require('./logger')
 
 const tenantResolver = require('./tenantResolver')
 const userProfile = require('./models/userprofile')
+const appLink = require('./models/applink')
 
 const PORT = process.env.PORT || 3000;
 
@@ -136,122 +136,33 @@ router.get("/me",tr.ensureAuthenticated(), async (req, res, next) => {
     }
 });
 
-router.post("/me/edit", [tr.ensureAuthenticated(), urlencodedParser], async (req, res, next) => {
-    const tokenSet = req.userContext.tokens;
-    axios.defaults.headers.common['Authorization'] = `Bearer `+tokenSet.access_token
-
-    try {        
-        await axios.post(tr.getRequestingTenant(req).tenant+'/api/v1/users/me', {
-            'profile': {
-                firstName: req.body.first_name,
-                lastName: req.body.last_name
-            }
-        })
-
-        res.redirect('/me');
-    }
-    catch(error) {
-        res.render("me",{
-            tenant: tr.getRequestingTenant(req).tenant,
-            tokenSet: req.userContext.tokens,
-            user: new userProfile(),
-            error: parseError(error)
-        });
-    }
-});
-
-router.get("/me/edit",tr.ensureAuthenticated(), async (req, res, next) => {
-    logger.verbose("/me requested")
-    const tokenSet = req.userContext.tokens;
-    axios.defaults.headers.common['Authorization'] = `Bearer `+tokenSet.access_token
-    try {
-        const response = await axios.get(tr.getRequestingTenant(req).tenant+'/api/v1/users/me')
-        var profile = new userProfile(response.data)
-        res.render("edit-profile",{
-            tenant: tr.getRequestingTenant(req).tenant,
-            tokenSet: req.userContext.tokens,
-            user: profile,
-        });
-    }
-    catch(error) {
-        res.render("me",{
-            tenant: tr.getRequestingTenant(req).tenant,
-            tokenSet: req.userContext.tokens,
-            user: new userProfile(),
-            error: parseError(error)
-        });
-    }
-});
-
-router.post("/me/change-password",[tr.ensureAuthenticated(), urlencodedParser], async (req, res, next) => {
-    logger.verbose("/password-reset posted")
-    const tokenSet = req.userContext.tokens;
-    axios.defaults.headers.common['Authorization'] = `Bearer `+tokenSet.access_token
-    try {
-        const response = await axios.get(tr.getRequestingTenant(req).tenant+'/api/v1/users/me')
-        var changePasswordLink = response.data._links.changePassword.href;
-
-        var body = {
-            oldPassword: req.body.current_password,
-            newPassword: req.body.password
-        }
-
-        await axios.post(changePasswordLink, body);
-
-        res.redirect('/me');
-    }
-    catch(error) {
-        res.render("change-password",{
-            error: parseError(error)
-        });
-    }
-});
-
-router.get("/me/change-password",tr.ensureAuthenticated(), async (req, res, next) => {
+router.get("/dashboard",tr.ensureAuthenticated(), async (req, res, next) => {
     logger.verbose("/password-reset requested")
     const tokenSet = req.userContext.tokens;
     axios.defaults.headers.common['Authorization'] = `Bearer `+tokenSet.access_token
     try {
-        const response = await axios.get(tr.getRequestingTenant(req).tenant+'/api/v1/users/me')
+        const response = await axios.get(tr.getRequestingTenant(req).tenant+'/api/v1/users/me/appLinks')
+        var apps = [];
 
-        res.render("change-password",{
+        for(var idx in response.data){
+            var app = new appLink(response.data[idx]);
+            apps.push(app);
+        }
+
+        res.render("dashboard",{
             tenant: tr.getRequestingTenant(req).tenant,
-            tokenSet: req.userContext.tokens
+            tokenSet: req.userContext.tokens,
+            apps: apps
         });
     }
     catch(error) {
-        res.render("me",{
-            tenant: tr.getRequestingTenant(req).tenant,
-            tokenSet: req.userContext.tokens,
-            user: new userProfile(),
-            error: parseError(error)
-        });
-    }
-});
-
-router.get("/me/configure-mfa",tr.ensureAuthenticated(), async (req, res, next) => {
-    logger.verbose("/configure-mfa requested")
-    const tokenSet = req.userContext.tokens;
-    axios.defaults.headers.common['Authorization'] = `Bearer `+tokenSet.access_token
-    try {
-        var idToken = parseJWT(req.userContext.tokens.id_token);
-        const enrolled = await axios.get(tr.getRequestingTenant(req).tenant+'/api/v1/users/'+idToken.sub+'/factors');
-        const toEnroll = await axios.get(tr.getRequestingTenant(req).tenant+'/api/v1/users/'+idToken.sub+'/factors/catalog');
-
-        res.render("configure-mfa",{
-            tenant: tr.getRequestingTenant(req).tenant,
-            tokenSet: req.userContext.tokens,
-            enrolledFactors: enrolled.data,
-            factorsToEnroll: toEnroll.data
-        });
-    }
-    catch(error) {
-        res.render("me",{
-            tenant: tr.getRequestingTenant(req).tenant,
-            tokenSet: req.userContext.tokens,
-            user: new userProfile(),
-            error: parseError(error)
-        });
+        console.log(error);
+         res.render("me",{
+             tenant: tr.getRequestingTenant(req).tenant,
+             tokenSet: req.userContext.tokens,
+             user: new userProfile(),
+             error: parseError(error)
+         });
     }
 });
 

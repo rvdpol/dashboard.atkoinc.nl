@@ -1,0 +1,12 @@
+<link rel="stylesheet" href="views/assets/css/dashboard.css">
+<h1>Your applications</h1>
+{{#each apps}}
+<div class="app-container">
+    <a href="{{linkUrl}}" target="_blank">
+        <div class="app-content">
+        <img src="{{logoUrl}}" />
+        <h4>{{label}}</h4>
+        </div>
+    </a>
+</div>
+{{/each}}
